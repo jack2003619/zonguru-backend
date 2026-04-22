@@ -1,40 +1,34 @@
 const express = require("express");
 const cors = require("cors");
-const mongoose = require("mongoose");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔗 MongoDB connect
-mongoose.connect("mongodb+srv://zonguru:<Wsadwsad123>@cluster0.a7zf0vj.mongodb.net/?appName=Cluster0");
+let users = {};
 
-const UserSchema = new mongoose.Schema({
-  username: String,
-  balance: { type: Number, default: 0 }
+app.get("/", (req, res) => {
+  res.send("Zonguru API Running 🚀");
 });
 
-const User = mongoose.model("User", UserSchema);
-
-// Deposit
-app.post("/deposit", async (req, res) => {
+app.post("/deposit", (req, res) => {
   const { user, amount } = req.body;
-
-  let u = await User.findOne({ username: user });
-  if (!u) u = new User({ username: user, balance: 0 });
-
-  u.balance += Number(amount);
-  await u.save();
-
-  res.json({ success: true, balance: u.balance });
+  users[user] = (users[user] || 0) + Number(amount);
+  res.json({ success: true, balance: users[user] });
 });
 
-// Withdraw
-app.post("/withdraw", async (req, res) => {
+app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
 
-  let u = await User.findOne({ username: user });
-  if (!u || u.balance < amount) {
+  if ((users[user] || 0) < amount) {
+    return res.json({ success: false, message: "Not enough balance" });
+  }
+
+  users[user] -= amount;
+  res.json({ success: true, balance: users[user] });
+});
+
+app.listen(3000, () => console.log("Server running"));  if (!u || u.balance < amount) {
     return res.json({ success: false, message: "Not enough balance" });
   }
 
