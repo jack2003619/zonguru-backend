@@ -1,6 +1,7 @@
 {
   "name": "zonguru-backend",
   "version": "1.0.0",
+  "description": "Zonguru backend server",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
