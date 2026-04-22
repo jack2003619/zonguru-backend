@@ -2,39 +2,31 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 let users = {};
 
-// test route
-app.get("/", (req, res) => {
-  res.send("Zonguru API running 🚀");
-});
-
-// deposit
 app.post("/deposit", (req, res) => {
   const { user, amount } = req.body;
-
-  if (!user || !amount) {
-    return res.json({ success: false, message: "Missing data" });
-  }
-
   users[user] = (users[user] || 0) + Number(amount);
-
-  res.json({
-    success: true,
-    balance: users[user]
-  });
+  res.json({ success: true, balance: users[user] });
 });
 
-// withdraw
 app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
-
   if ((users[user] || 0) < amount) {
-    return res.json({
+    return res.json({ success: false, message: "Not enough balance" });
+  }
+  users[user] -= amount;
+  res.json({ success: true, balance: users[user] });
+});
+
+app.get("/balance/:user", (req, res) => {
+  res.json({ balance: users[req.params.user] || 0 });
+});
+
+app.listen(3000, () => console.log("Server running"));    return res.json({
       success: false,
       message: "Not enough balance"
     });
