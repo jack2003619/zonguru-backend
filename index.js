@@ -2,10 +2,16 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
 let users = {};
+
+// test route
+app.get("/", (req, res) => {
+  res.send("Zonguru API running 🚀");
+});
 
 // deposit
 app.post("/deposit", (req, res) => {
@@ -19,7 +25,6 @@ app.post("/deposit", (req, res) => {
 
   res.json({
     success: true,
-    message: "Deposit success",
     balance: users[user]
   });
 });
@@ -35,6 +40,19 @@ app.post("/withdraw", (req, res) => {
     });
   }
 
+  users[user] -= amount;
+
+  res.json({
+    success: true,
+    balance: users[user]
+  });
+});
+
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
   users[user] -= Number(amount);
 
   res.json({
