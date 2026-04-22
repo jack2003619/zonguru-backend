@@ -8,7 +8,7 @@ app.use(express.json());
 let users = {};
 
 app.get("/", (req, res) => {
-  res.send("Zonguru API running 🚀");
+  res.send("Zonguru API running");
 });
 
 app.post("/deposit", (req, res) => {
@@ -26,15 +26,7 @@ app.post("/withdraw", (req, res) => {
   res.json({ success: true, balance: users[user] });
 });
 
-app.listen(10000, () => console.log("Server running"));
-// Withdraw
-app.post("/withdraw", async (req, res) => {
-  const { user, amount } = req.body;
-
-  let u = await User.findOne({ username: user });
-
-  if (!u || u.balance < amount) {
-    return res.json({ success: false, message: "Not enough balance" });
+app.listen(10000, () => console.log("Server running"));    return res.json({ success: false, message: "Not enough balance" });
   }
 
   u.balance -= amount;
