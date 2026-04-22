@@ -5,36 +5,28 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Fake database (memory)
 let users = {};
 
-// Home route
 app.get("/", (req, res) => {
-  res.send("Zonguru API Running 🚀");
+  res.send("Zonguru API Running");
 });
 
-// Deposit
 app.post("/deposit", (req, res) => {
   const { user, amount } = req.body;
-
-  if (!user || !amount) {
-    return res.json({ success: false, message: "Missing data" });
-  }
-
   users[user] = (users[user] || 0) + Number(amount);
-
-  res.json({
-    success: true,
-    user,
-    balance: users[user]
-  });
+  res.json({ success: true, balance: users[user] });
 });
 
-// Withdraw
 app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
+  if ((users[user] || 0) < amount) {
+    return res.json({ success: false, message: "Not enough balance" });
+  }
+  users[user] -= amount;
+  res.json({ success: true, balance: users[user] });
+});
 
-  if (!user || !amount) {
+app.listen(10000, () => console.log("Server running"));  if (!user || !amount) {
     return res.json({ success: false, message: "Missing data" });
   }
 
