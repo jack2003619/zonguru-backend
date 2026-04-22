@@ -5,28 +5,41 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Fake database (memory)
 let users = {};
 
+// Home route
+app.get("/", (req, res) => {
+  res.send("Zonguru API Running 🚀");
+});
+
+// Deposit
 app.post("/deposit", (req, res) => {
   const { user, amount } = req.body;
+
+  if (!user || !amount) {
+    return res.json({ success: false, message: "Missing data" });
+  }
+
   users[user] = (users[user] || 0) + Number(amount);
-  res.json({ success: true, balance: users[user] });
+
+  res.json({
+    success: true,
+    user,
+    balance: users[user]
+  });
 });
 
+// Withdraw
 app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
-  if ((users[user] || 0) < amount) {
-    return res.json({ success: false, message: "Not enough balance" });
+
+  if (!user || !amount) {
+    return res.json({ success: false, message: "Missing data" });
   }
-  users[user] -= amount;
-  res.json({ success: true, balance: users[user] });
-});
 
-app.get("/balance/:user", (req, res) => {
-  res.json({ balance: users[req.params.user] || 0 });
-});
-
-app.listen(3000, () => console.log("Server running"));    return res.json({
+  if ((users[user] || 0) < amount) {
+    return res.json({
       success: false,
       message: "Not enough balance"
     });
@@ -35,6 +48,23 @@ app.listen(3000, () => console.log("Server running"));    return res.json({
   users[user] -= amount;
 
   res.json({
+    success: true,
+    user,
+    balance: users[user]
+  });
+});
+
+// Check balance
+app.get("/balance/:user", (req, res) => {
+  const user = req.params.user;
+  res.json({
+    user,
+    balance: users[user] || 0
+  });
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("Server running on port " + PORT));  res.json({
     success: true,
     balance: users[user]
   });
