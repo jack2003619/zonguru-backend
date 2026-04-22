@@ -1,31 +1,53 @@
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-let users = {};
+// 🔗 MongoDB connect
+mongoose.connect("mongodb+srv://zonguru:<Wsadwsad123>@cluster0.a7zf0vj.mongodb.net/?appName=Cluster0");
 
-app.post("/deposit", (req, res) => {
+const UserSchema = new mongoose.Schema({
+  username: String,
+  balance: { type: Number, default: 0 }
+});
+
+const User = mongoose.model("User", UserSchema);
+
+// Deposit
+app.post("/deposit", async (req, res) => {
   const { user, amount } = req.body;
-  users[user] = (users[user] || 0) + Number(amount);
-  res.json({
-  success: true,
-  message: "Deposit successful",
-  balance: users[user]
+
+  let u = await User.findOne({ username: user });
+  if (!u) u = new User({ username: user, balance: 0 });
+
+  u.balance += Number(amount);
+  await u.save();
+
+  res.json({ success: true, balance: u.balance });
 });
-app.post("/withdraw", (req, res) => {
+
+// Withdraw
+app.post("/withdraw", async (req, res) => {
   const { user, amount } = req.body;
-  users[user] = (users[user] || 0) - Number(amount);
-  res.json({
-  success: true,
-  message: "Withdraw successful",
-  balance: users[user]
+
+  let u = await User.findOne({ username: user });
+  if (!u || u.balance < amount) {
+    return res.json({ success: false, message: "Not enough balance" });
+  }
+
+  u.balance -= Number(amount);
+  await u.save();
+
+  res.json({ success: true, balance: u.balance });
 });
 
-app.get("/", (req,res)=>{
-  res.send("Zonguru Backend Live 🚀");
+// User list
+app.get("/users", async (req, res) => {
+  const users = await User.find();
+  res.json(users);
 });
 
-app.listen(process.env.PORT || 3000);
+app.listen(3000, () => console.log("Server running"));
