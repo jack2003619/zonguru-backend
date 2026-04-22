@@ -7,27 +7,28 @@ app.use(express.json());
 
 let users = {};
 
-// Deposit
+// deposit
 app.post("/deposit", (req, res) => {
   const { user, amount } = req.body;
 
-  if (!users[user]) {
-    users[user] = 0;
+  if (!user || !amount) {
+    return res.json({ success: false, message: "Missing data" });
   }
 
-  users[user] += Number(amount);
+  users[user] = (users[user] || 0) + Number(amount);
 
   res.json({
     success: true,
+    message: "Deposit success",
     balance: users[user]
   });
 });
 
-// Withdraw
+// withdraw
 app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
 
-  if (!users[user] || users[user] < amount) {
+  if ((users[user] || 0) < amount) {
     return res.json({
       success: false,
       message: "Not enough balance"
@@ -35,6 +36,24 @@ app.post("/withdraw", (req, res) => {
   }
 
   users[user] -= Number(amount);
+
+  res.json({
+    success: true,
+    message: "Withdraw success",
+    balance: users[user]
+  });
+});
+
+// check balance
+app.get("/balance/:user", (req, res) => {
+  const user = req.params.user;
+  res.json({ balance: users[user] || 0 });
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});erssers[user] -= Number(amount);
 
   res.json({
     success: true,
