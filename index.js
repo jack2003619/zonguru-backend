@@ -10,13 +10,18 @@ let users = {};
 app.post("/deposit", (req, res) => {
   const { user, amount } = req.body;
   users[user] = (users[user] || 0) + Number(amount);
-  res.json({ success: true, balance: users[user] });
+  res.json({
+  success: true,
+  message: "Deposit successful",
+  balance: users[user]
 });
-
 app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
   users[user] = (users[user] || 0) - Number(amount);
-  res.json({ success: true, balance: users[user] });
+  res.json({
+  success: true,
+  message: "Withdraw successful",
+  balance: users[user]
 });
 
 app.get("/", (req,res)=>{
