@@ -7,34 +7,53 @@ app.use(express.json());
 
 let users = {};
 
-app.get("/", (req, res) => {
-  res.send("Zonguru API running");
-});
-
+// Deposit
 app.post("/deposit", (req, res) => {
   const { user, amount } = req.body;
-  users[user] = (users[user] || 0) + Number(amount);
-  res.json({ success: true, balance: users[user] });
+
+  if (!users[user]) {
+    users[user] = 0;
+  }
+
+  users[user] += Number(amount);
+
+  res.json({
+    success: true,
+    balance: users[user]
+  });
 });
 
+// Withdraw
 app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
-  if ((users[user] || 0) < amount) {
-    return res.json({ success: false, message: "Not enough balance" });
-  }
-  users[user] -= amount;
-  res.json({ success: true, balance: users[user] });
-});
 
-app.listen(10000, () => console.log("Server running"));    return res.json({ success: false, message: "Not enough balance" });
+  if (!users[user] || users[user] < amount) {
+    return res.json({
+      success: false,
+      message: "Not enough balance"
+    });
   }
 
-  u.balance -= amount;
-  await u.save();
+  users[user] -= Number(amount);
 
-  res.json({ success: true, balance: u.balance });
+  res.json({
+    success: true,
+    balance: users[user]
+  });
 });
 
+// Check balance
+app.get("/balance/:user", (req, res) => {
+  res.json({
+    balance: users[req.params.user] || 0
+  });
+});
+
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
 // Balance check
 app.get("/balance/:user", async (req, res) => {
   const u = await User.findOne({ username: req.params.user });
