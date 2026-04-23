@@ -5,27 +5,39 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// database (temporary)
 let users = {};
 
+// Home
 app.get("/", (req, res) => {
   res.send("Zonguru API Running");
 });
 
-app.post("/deposit", (req, res) => {
-  const { user, amount } = req.body;
-  users[user] = (users[user] || 0) + Number(amount);
-  res.json({ success: true, balance: users[user] });
-});
+// Register
+app.post("/register", (req, res) => {
+  const { username, password } = req.body;
 
-app.post("/withdraw", (req, res) => {
-  const { user, amount } = req.body;
-
-  if ((users[user] || 0) < amount) {
-    return res.json({ success: false, message: "Not enough balance" });
+  if (users[username]) {
+    return res.json({ success: false, message: "User already exists" });
   }
 
-  users[user] -= amount;
-  res.json({ success: true, balance: users[user] });
+  users[username] = {
+    password,
+    balance: 0
+  };
+
+  res.json({ success: true, message: "Registered successfully" });
+});
+
+// Login
+app.post("/login", (req, res) => {
+  const { username, password } = req.body;
+
+  if (!users[username] || users[username].password !== password) {
+    return res.json({ success: false, message: "Invalid login" });
+  }
+
+  res.json({ success: true, message: "Login success", user: username });
 });
 
 app.listen(10000, () => {
