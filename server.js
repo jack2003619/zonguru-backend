@@ -9,9 +9,9 @@ app.use(express.json());
 // MongoDB connect
 mongoose.connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDB Connected"))
-  .catch(err => console.log(err));
+  .catch(err => console.log("DB Error:", err));
 
-// Models
+// ================= MODELS =================
 const User = mongoose.model("User", {
   username: String,
   password: String,
@@ -26,47 +26,68 @@ const Product = mongoose.model("Product", {
   vipLevel: Number
 });
 
-// TEST ROUTE (စမ်းဖို့)
+// ================= ROUTES =================
+
+// Test
 app.get("/", (req, res) => {
   res.send("API WORKING");
 });
 
-// REGISTER
+// Register
 app.post("/register", async (req, res) => {
-  const user = new User(req.body);
-  await user.save();
-  res.json({ message: "Registered" });
+  try {
+    const user = new User(req.body);
+    await user.save();
+    res.json({ success: true, message: "Registered" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// LOGIN
+// Login
 app.post("/login", async (req, res) => {
-  const user = await User.findOne(req.body);
-  if (!user) return res.json({ error: "Invalid" });
-  res.json(user);
+  try {
+    const user = await User.findOne({
+      username: req.body.username,
+      password: req.body.password
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid login" });
+    }
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 🔥 ALL PRODUCTS (အရေးကြီး)
+// All products
 app.get("/products", async (req, res) => {
   try {
     const products = await Product.find();
+    console.log("Products fetched:", products.length);
     res.json(products);
   } catch (err) {
-    res.json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// 🔥 VIP PRODUCTS
+// VIP products
 app.get("/products/:vip", async (req, res) => {
   try {
     const vip = Number(req.params.vip);
+
     const products = await Product.find({
       vipLevel: { $lte: vip }
     });
+
     res.json(products);
   } catch (err) {
-    res.json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
+// ================= SERVER =================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running"));
+app.listen(PORT, () => console.log("Server running on " + PORT));
