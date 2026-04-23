@@ -19,22 +19,18 @@ app.post("/deposit", (req, res) => {
 
 app.post("/withdraw", (req, res) => {
   const { user, amount } = req.body;
+
   if ((users[user] || 0) < amount) {
     return res.json({ success: false, message: "Not enough balance" });
   }
+
   users[user] -= amount;
   res.json({ success: true, balance: users[user] });
 });
 
-app.listen(10000, () => console.log("Server running"));
-  }
-
-  users[user] -= amount;
-
-  res.json({
-    success: true,
-    user,
-    balance: users[user]
+app.listen(10000, () => {
+  console.log("Server running");
+});    balance: users[user]
   });
 });
 
