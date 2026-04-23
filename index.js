@@ -3,6 +3,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -11,7 +12,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log(err));
 
-// 🧠 Schema
+// 🧠 User Schema
 const UserSchema = new mongoose.Schema({
   username: String,
   password: String,
@@ -20,50 +21,81 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", UserSchema);
 
-// Home
+// 🏠 Home
 app.get("/", (req, res) => {
   res.send("Zonguru API Running with DB");
 });
 
-// Register
+// 🧪 Test route
+app.get("/test", (req, res) => {
+  res.json({ message: "API OK" });
+});
+
+// 🔐 Register
 app.post("/register", async (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
 
-  const exist = await User.findOne({ username });
-  if (exist) {
-    return res.json({ success: false, message: "User exists" });
+    const exist = await User.findOne({ username });
+
+    if (exist) {
+      return res.json({ success: false, message: "User already exists" });
+    }
+
+    const newUser = new User({
+      username,
+      password,
+      balance: 0
+    });
+
+    await newUser.save();
+
+    res.json({ success: true, message: "Register success" });
+
+  } catch (err) {
+    res.json({ success: false, message: "Error: " + err.message });
   }
-
-  const newUser = new User({ username, password });
-  await newUser.save();
-
-  res.json({ success: true, message: "Registered" });
 });
 
-// Login
+// 🔑 Login
 app.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
 
-  const user = await User.findOne({ username, password });
-  if (!user) {
-    return res.json({ success: false });
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    if (user.password !== password) {
+      return res.json({ success: false, message: "Wrong password" });
+    }
+
+    res.json({
+      success: true,
+      message: "Login success",
+      balance: user.balance
+    });
+
+  } catch (err) {
+    res.json({ success: false, message: "Error: " + err.message });
   }
-
-  res.json({ success: true, user: username, balance: user.balance });
 });
 
-// Deposit
+// 💰 Deposit
 app.post("/deposit", async (req, res) => {
   const { user, amount } = req.body;
 
   const u = await User.findOne({ username: user });
+
   u.balance += Number(amount);
   await u.save();
 
   res.json({ balance: u.balance });
 });
 
-// Withdraw
+// 💸 Withdraw
 app.post("/withdraw", async (req, res) => {
   const { user, amount } = req.body;
 
@@ -79,4 +111,7 @@ app.post("/withdraw", async (req, res) => {
   res.json({ success: true, balance: u.balance });
 });
 
-app.listen(10000, () => console.log("Server running"));
+// 🚀 Server
+app.listen(10000, () => {
+  console.log("Server running on port 10000");
+});
