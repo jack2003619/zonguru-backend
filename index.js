@@ -26,7 +26,7 @@ app.post("/withdraw", (req, res) => {
   res.json({ success: true, balance: users[user] });
 });
 
-app.listen(10000, () => console.log("Server running"));    });
+app.listen(10000, () => console.log("Server running"));
   }
 
   users[user] -= amount;
