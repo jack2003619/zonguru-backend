@@ -26,15 +26,7 @@ app.post("/withdraw", (req, res) => {
   res.json({ success: true, balance: users[user] });
 });
 
-app.listen(10000, () => console.log("Server running"));  if (!user || !amount) {
-    return res.json({ success: false, message: "Missing data" });
-  }
-
-  if ((users[user] || 0) < amount) {
-    return res.json({
-      success: false,
-      message: "Not enough balance"
-    });
+app.listen(10000, () => console.log("Server running"));    });
   }
 
   users[user] -= amount;
