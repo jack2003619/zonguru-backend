@@ -448,7 +448,7 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
       if(Math.abs(Number(task.currentProductAmount||0)-desiredAmount)>0.009){
         task.currentProductAmount=desiredAmount;
         task.currentTaskNumber=taskNumber;
-        if(!task.currentOrderExpiresAt)task.currentOrderExpiresAt=new Date(Date.now()+60*60*1000);
+        if(!task.currentOrderExpiresAt)task.currentOrderExpiresAt=null;
         task.updatedAt=new Date();
         await task.save();
       }
@@ -603,6 +603,22 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
     });
   }
 });
+app.post("/api/tasks/:productId/start",auth,async(req,res)=>{
+  try{
+    const task=await TaskProgress.findOne({userId:req.auth.id});
+    if(!task||!task.currentProductId||String(task.currentProductId)!==String(req.params.productId))
+      return res.status(400).json({success:false,message:"This is not the current task product"});
+    if(!task.currentOrderExpiresAt) {
+      task.currentOrderExpiresAt=new Date(Date.now()+60*60*1000);
+      task.updatedAt=new Date();
+      await task.save();
+    }
+    res.json({success:true,orderExpiresAt:task.currentOrderExpiresAt});
+  }catch(e){
+    res.status(500).json({success:false,message:"Unable to start order timer"});
+  }
+});
+
 function getReviewSuggestions(product){
   const text=((product?.name||"")+" "+(product?.description||"")+" "+(product?.category||"")).toLowerCase();
   if(/pen|stationery|paper|notebook|office/.test(text))
@@ -859,10 +875,15 @@ app.post("/api/admin/transactions/:id/approve",auth,admin,async(req,res)=>{
   if(t.status!=="pending")return res.status(400).json({success:false,message:"Transaction already reviewed"});
   const user=await User.findById(t.userId);
   if(!user)return res.status(404).json({success:false,message:"User not found"});
-  if(t.type==="deposit")user.balance+=t.amount;
+  const transactionCurrency=String(t.details?.currency||t.details?.coin||user.currency||"USDT").toUpperCase();
+  if(t.type==="deposit"){
+    user.balance+=t.amount;
+    user.currency=transactionCurrency;
+  }
   if(t.type==="withdrawal"){
     if(user.balance<t.amount)return res.status(400).json({success:false,message:"Insufficient balance"});
     user.balance-=t.amount;
+    user.currency=transactionCurrency;
   }
   await user.save();
   t.status="approved";t.reviewedAt=new Date();await t.save();
