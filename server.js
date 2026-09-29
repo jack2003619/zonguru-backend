@@ -654,8 +654,25 @@ app.post("/api/tasks/:productId/complete",auth,async(req,res)=>{
     if((task.completedIds||[]).length>=5)return res.json({success:true,message:"Task already completed",completed:5,total:5,taskComplete:true});
     const user=await User.findById(req.auth.id),product=await Product.findById(req.params.productId);
     if(!user||!product)return res.status(404).json({success:false,message:"User or product not found"});
+
+    // If the browser/task state was refreshed after an insufficient-balance
+    // event, recover the exact pending order before doing any balance check.
+    // This keeps the original order resumable after an admin top-up.
+    const pendingResume=await Order.findOne({
+      userId:user._id,
+      productId:product._id,
+      status:"pending"
+    }).sort({createdAt:-1});
+    if(pendingResume && (!task.currentProductId || String(task.currentProductId)!==String(product._id))){
+      task.currentProductId=product._id;
+      task.currentProductAmount=Number(pendingResume.amount||0);
+      task.currentTaskNumber=Number(pendingResume.taskNumber||((task.completedIds||[]).length+1));
+      task.updatedAt=new Date();
+      await task.save();
+    }
+
     if(Number(user.vipLevel||0)<Number(product.requiredVip||0))return res.status(403).json({success:false,message:"VIP level required",requiredVip:Number(product.requiredVip||0)});
-    const amount=Number(task.currentProductAmount||0),rate=Number(product.profitRate||product.dailyRate||0);
+    const amount=Number(pendingResume?.amount||task.currentProductAmount||0),rate=Number(product.profitRate||product.dailyRate||0);
     if(amount<=0)return res.status(400).json({success:false,message:"Product value is not configured"});
     const taskNumber=Number(task.completedIds.length||0)+1;
     const userRuleTriggered=Boolean(user.insufficientBalanceEnabled)&&Number(user.insufficientBalanceTaskNumber||0)===taskNumber&&Number(user.insufficientBalanceRequiredAmount||0)>0;
@@ -665,7 +682,7 @@ app.post("/api/tasks/:productId/complete",auth,async(req,res)=>{
     // order amount must remain the requirement even after the account balance
     // is topped up by an admin. This lets the SAME order resume and complete
     // as soon as the user's balance reaches the order amount.
-    let pendingOrder=await Order.findOne({userId:user._id,productId:product._id,taskNumber,status:"pending"}).sort({createdAt:-1});
+    let pendingOrder=pendingResume||await Order.findOne({userId:user._id,productId:product._id,taskNumber,status:"pending"}).sort({createdAt:-1});
     const requiredBalance=pendingOrder
       ? Number(pendingOrder.amount||amount)
       : (userRuleTriggered?amount:(product.balanceGuardEnabled?amount:0));
