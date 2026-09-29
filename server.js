@@ -457,16 +457,23 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
       }
     }
 
-    // If the admin rule was changed after this product was created,
-    // refresh the current amount so Task 3 immediately reflects the rule.
-    if(current && userRuleTriggered){
-      const desiredAmount=Math.round((balance+shortfall)*100)/100;
-      if(Math.abs(Number(task.currentProductAmount||0)-desiredAmount)>0.009){
-        task.currentProductAmount=desiredAmount;
-        task.currentTaskNumber=taskNumber;
-        if(!task.currentOrderExpiresAt)task.currentOrderExpiresAt=null;
-        task.updatedAt=new Date();
-        await task.save();
+    // Once an insufficient-balance order exists, its amount is locked.
+    // Admin balance top-ups must NOT increase the order amount.
+    let pendingCurrentOrder=null;
+    if(current){
+      pendingCurrentOrder=await Order.findOne({
+        userId:user._id,
+        productId:current._id,
+        status:"pending"
+      }).sort({createdAt:-1});
+      if(pendingCurrentOrder){
+        const originalAmount=Number(pendingCurrentOrder.amount||0);
+        if(originalAmount>0 && Math.abs(Number(task.currentProductAmount||0)-originalAmount)>0.009){
+          task.currentProductAmount=originalAmount;
+          task.currentTaskNumber=Number(pendingCurrentOrder.taskNumber||taskNumber);
+          task.updatedAt=new Date();
+          await task.save();
+        }
       }
     }
 
@@ -571,17 +578,23 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
     }
 
     const rate=Number(current.profitRate||current.dailyRate||0);
-    const baseProfit=Number(task.currentProductAmount||0)*rate/100;
+    const orderAmount=Number(task.currentProductAmount||0);
+    const baseProfit=orderAmount*rate/100;
     const multiplier=userRuleTriggered
       ? Math.max(1,Math.min(20,Number(user.insufficientBalanceCommissionMultiplier||1)))
       : 1;
+    // Insufficient status is always based on the CURRENT account balance.
+    // When admin tops up the account to the locked order amount, the same
+    // pending order becomes completable.
+    const insufficientNow=Number(balance||0)<orderAmount;
+    const liveShortfall=Math.max(0,orderAmount-Number(balance||0));
 
     const productPayload={
       id:current._id,
       name:current.name,
       description:current.description,
       category:current.category,
-      price:Number(task.currentProductAmount||0),
+      price:orderAmount,
       profitRate:rate,
       profitAmount:baseProfit*multiplier,
       image:current.image||"",
@@ -591,10 +604,10 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
       specialTaskNumber:Number(current.specialTaskNumber||0),
       specialRequiredAmount:Number(current.specialRequiredAmount||0),
       specialCommissionMultiplier:Number(current.specialCommissionMultiplier||1),
-      insufficientBalance:userRuleTriggered,
-      insufficientBalanceTaskNumber:userRuleTriggered?taskNumber:0,
-      insufficientBalanceShortfall:userRuleTriggered?shortfall:0,
-      insufficientBalanceRequiredAmount:userRuleTriggered?shortfall:0,
+      insufficientBalance:insufficientNow,
+      insufficientBalanceTaskNumber:insufficientNow?Number(pendingCurrentOrder?.taskNumber||taskNumber):0,
+      insufficientBalanceShortfall:liveShortfall,
+      insufficientBalanceRequiredAmount:liveShortfall,
       insufficientBalanceCommissionMultiplier:userRuleTriggered?multiplier:1,
       completed:false,
       orderExpiresAt:task.currentOrderExpiresAt||null,
