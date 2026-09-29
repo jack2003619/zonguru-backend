@@ -478,6 +478,32 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
     }
 
     if(!current){
+      // Resume an existing insufficient-balance order before generating any
+      // new amount. The original order amount is immutable until completion.
+      const lockedOrder=await Order.findOne({
+        userId:user._id,
+        taskNumber,
+        status:"pending"
+      }).sort({createdAt:-1});
+      if(lockedOrder){
+        const lockedProduct=await Product.findOne({
+          _id:lockedOrder.productId,
+          active:true,
+          requiredVip:{$lte:vipLevel}
+        });
+        if(lockedProduct){
+          current=lockedProduct;
+          task.currentProductId=lockedProduct._id;
+          task.currentProductAmount=Number(lockedOrder.amount||0);
+          task.currentTaskNumber=Number(lockedOrder.taskNumber||taskNumber);
+          task.currentOrderExpiresAt=task.currentOrderExpiresAt||null;
+          task.updatedAt=new Date();
+          await task.save();
+        }
+      }
+    }
+
+    if(!current){
       const recent=(task.recentProductIds||[]).map(String);
       const userRecent=(user.recentTaskProductIds||[]).map(String);
       const excluded=new Set([...recent,...completedIds.map(String),...userRecent]);
