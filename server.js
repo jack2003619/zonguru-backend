@@ -660,6 +660,10 @@ app.post("/api/tasks/:productId/complete",auth,async(req,res)=>{
     const taskNumber=Number(task.completedIds.length||0)+1;
     const userRuleTriggered=Boolean(user.insufficientBalanceEnabled)&&Number(user.insufficientBalanceTaskNumber||0)===taskNumber&&Number(user.insufficientBalanceRequiredAmount||0)>0;
     const specialTriggered=userRuleTriggered,configuredShortfall=userRuleTriggered?Number(user.insufficientBalanceRequiredAmount||0):0;
+    // Reuse the pending order created by an earlier insufficient-balance attempt.
+    // After the required deposit is approved, the same order can be completed
+    // instead of being treated as a new order.
+    let pendingOrder=await Order.findOne({userId:user._id,productId:product._id,taskNumber,status:"pending"}).sort({createdAt:-1});
     const requiredBalance=userRuleTriggered?amount:(product.balanceGuardEnabled?amount:0);
     if(requiredBalance>0&&Number(user.balance||0)<requiredBalance){
       const availableBalance=Number(user.balance||0),difference=Math.max(0,requiredBalance-availableBalance);
@@ -671,7 +675,21 @@ app.post("/api/tasks/:productId/complete",auth,async(req,res)=>{
     if(reviewText.length>1000)return res.status(400).json({success:false,message:"Review is too long"});
     const baseCommission=amount*(rate/100),commissionMultiplier=specialTriggered?Math.max(1,Math.min(20,Number(user.insufficientBalanceCommissionMultiplier||1))):1,commission=baseCommission*commissionMultiplier;
     task.completedIds.push(req.params.productId);task.productIds=[...(task.productIds||[]),req.params.productId].slice(-20);task.recentProductIds=[...(task.recentProductIds||[]),req.params.productId].slice(-15);task.currentProductId=null;task.currentProductAmount=0;task.currentTaskNumber=0;task.currentOrderExpiresAt=null;task.updatedAt=new Date();await task.save();
-    await Order.create({userId:req.auth.id,productId:req.params.productId,productName:product.name||"Product",amount,profitRate:rate,commission,baseCommission,commissionMultiplier,availableBalance:Number(user.balance||0),shortfall:0,taskNumber,reviewText,status:"completed"});
+    if(pendingOrder){
+      pendingOrder.amount=amount;
+      pendingOrder.profitRate=rate;
+      pendingOrder.commission=commission;
+      pendingOrder.baseCommission=baseCommission;
+      pendingOrder.commissionMultiplier=commissionMultiplier;
+      pendingOrder.availableBalance=Number(user.balance||0);
+      pendingOrder.shortfall=0;
+      pendingOrder.reviewText=reviewText;
+      pendingOrder.status="completed";
+      pendingOrder.completedAt=new Date();
+      await pendingOrder.save();
+    }else{
+      await Order.create({userId:req.auth.id,productId:req.params.productId,productName:product.name||"Product",amount,profitRate:rate,commission,baseCommission,commissionMultiplier,availableBalance:Number(user.balance||0),shortfall:0,taskNumber,reviewText,status:"completed"});
+    }
     const updatedUser=await User.findOneAndUpdate({_id:user._id},{$inc:{balance:commission,totalProfit:commission}},{new:true,runValidators:false});
     if(!updatedUser)throw new Error("Unable to update account balance");
     const completed=task.completedIds.length;
