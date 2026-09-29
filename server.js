@@ -650,19 +650,24 @@ app.post("/api/tasks/:productId/complete",auth,async(req,res)=>{
   try{
     const task=await TaskProgress.findOne({userId:req.auth.id});
     if(!task)return res.status(404).json({success:false,message:"No active task"});
-    if(!task.currentProductId||String(task.currentProductId)!==String(req.params.productId))return res.status(400).json({success:false,message:"This is not the current task product"});
     if((task.completedIds||[]).length>=5)return res.json({success:true,message:"Task already completed",completed:5,total:5,taskComplete:true});
+
     const user=await User.findById(req.auth.id),product=await Product.findById(req.params.productId);
     if(!user||!product)return res.status(404).json({success:false,message:"User or product not found"});
 
-    // If the browser/task state was refreshed after an insufficient-balance
-    // event, recover the exact pending order before doing any balance check.
-    // This keeps the original order resumable after an admin top-up.
+    // Always look for the original pending order first. This is the key
+    // resume path after an insufficient-balance event: even if the task
+    // state was refreshed/reset, the SAME pending order can be resumed.
     const pendingResume=await Order.findOne({
       userId:user._id,
       productId:product._id,
       status:"pending"
     }).sort({createdAt:-1});
+
+    if(!pendingResume && (!task.currentProductId || String(task.currentProductId)!==String(product._id))){
+      return res.status(400).json({success:false,message:"This is not the current task product"});
+    }
+
     if(pendingResume && (!task.currentProductId || String(task.currentProductId)!==String(product._id))){
       task.currentProductId=product._id;
       task.currentProductAmount=Number(pendingResume.amount||0);
