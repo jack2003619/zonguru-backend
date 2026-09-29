@@ -309,6 +309,22 @@ function admin(req,res,next){
   next();
 }
 
+app.get("/health/db-check",async(req,res)=>{
+  try{
+    if(mongoose.connection.readyState!==1)
+      return res.status(503).json({success:false,database:"disconnected"});
+    const count=await User.countDocuments();
+    res.json({
+      success:true,
+      databaseName:mongoose.connection.name,
+      userCount:count,
+      readyState:mongoose.connection.readyState
+    });
+  }catch(e){
+    res.status(503).json({success:false,message:"Database check failed"});
+  }
+});
+
 app.get("/api/me",auth,async(req,res)=>{
   const user=await User.findById(req.auth.id);
   if(!user)return res.status(404).json({success:false,message:"User not found"});
