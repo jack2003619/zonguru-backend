@@ -461,8 +461,18 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
 
       let candidates=await Product.find({
         active:true,
-        requiredVip:{$lte:vipLevel}
+        requiredVip:{$lte:vipLevel},
+        minBalance:{$lte:balance},
+        $or:[{maxBalance:{$lte:0}},{maxBalance:{$gte:balance}}]
       }).lean();
+
+      // If no balance-matched products exist, use the full VIP-eligible catalog.
+      if(!candidates.length){
+        candidates=await Product.find({
+          active:true,
+          requiredVip:{$lte:vipLevel}
+        }).lean();
+      }
 
       // If a fresh deployment has not run catalog seeding yet, seed it now.
       if(!candidates.length){
@@ -938,6 +948,15 @@ async function ensureProductCatalog(){
     valueTier:1+(i%5)
   }));
   if(add.length)await Product.insertMany(add);
+  const catalogImageSet=[
+    "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1585336261022-680e295ce5b4?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1558008258-3256797b43f3?auto=format&fit=crop&w=900&q=80"
+  ];
+  const missingImages=await Product.find({active:true,$or:[{image:{$exists:false}},{image:null},{image:""}]});
+  for(const [i,p] of missingImages.entries()){p.image=catalogImageSet[i%catalogImageSet.length];await p.save();}
   const missingTier=await Product.find({name:{$in:catalogNames},$or:[{valueTier:{$exists:false}},{valueTier:{$lt:1}},{valueTier:{$gt:5}}]});
   for(const p of missingTier){
     const idx=catalogNames.indexOf(p.name);
