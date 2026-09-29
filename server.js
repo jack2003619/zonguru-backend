@@ -539,7 +539,7 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
       task.currentProductId=current._id;
       task.currentProductAmount=amount;
       task.currentTaskNumber=taskNumber;
-      task.currentOrderExpiresAt=new Date(Date.now()+60*60*1000);
+      task.currentOrderExpiresAt=null;
       task.recentProductIds=[...(task.recentProductIds||[]),current._id].slice(-15);
       task.updatedAt=new Date();
       await task.save();
@@ -581,7 +581,7 @@ app.get("/api/tasks/current",auth,async(req,res)=>{
       insufficientBalanceRequiredAmount:userRuleTriggered?shortfall:0,
       insufficientBalanceCommissionMultiplier:userRuleTriggered?multiplier:1,
       completed:false,
-      orderExpiresAt:task.currentOrderExpiresAt||new Date(Date.now()+60*60*1000),
+      orderExpiresAt:task.currentOrderExpiresAt||null,
       reviewSuggestions:getReviewSuggestions(current)
     };
 
