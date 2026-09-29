@@ -660,16 +660,37 @@ app.post("/api/tasks/:productId/complete",auth,async(req,res)=>{
     const taskNumber=Number(task.completedIds.length||0)+1;
     const userRuleTriggered=Boolean(user.insufficientBalanceEnabled)&&Number(user.insufficientBalanceTaskNumber||0)===taskNumber&&Number(user.insufficientBalanceRequiredAmount||0)>0;
     const specialTriggered=userRuleTriggered,configuredShortfall=userRuleTriggered?Number(user.insufficientBalanceRequiredAmount||0):0;
-    // Reuse the pending order created by an earlier insufficient-balance attempt.
-    // After the required deposit is approved, the same order can be completed
-    // instead of being treated as a new order.
+
+    // An insufficient-balance order is a locked pending order. Its original
+    // order amount must remain the requirement even after the account balance
+    // is topped up by an admin. This lets the SAME order resume and complete
+    // as soon as the user's balance reaches the order amount.
     let pendingOrder=await Order.findOne({userId:user._id,productId:product._id,taskNumber,status:"pending"}).sort({createdAt:-1});
-    const requiredBalance=userRuleTriggered?amount:(product.balanceGuardEnabled?amount:0);
+    const requiredBalance=pendingOrder
+      ? Number(pendingOrder.amount||amount)
+      : (userRuleTriggered?amount:(product.balanceGuardEnabled?amount:0));
+
     if(requiredBalance>0&&Number(user.balance||0)<requiredBalance){
       const availableBalance=Number(user.balance||0),difference=Math.max(0,requiredBalance-availableBalance);
-      let pending=await Order.findOne({userId:user._id,productId:product._id,taskNumber,status:"pending"}).sort({createdAt:-1});
-      if(!pending)pending=await Order.create({userId:user._id,productId:product._id,productName:product.name||"Product",amount,profitRate:rate,commission:0,baseCommission:amount*(rate/100),commissionMultiplier:1,availableBalance,shortfall:difference,taskNumber,reviewText:String(req.body?.reviewText||"").trim(),status:"pending"});
-      return res.status(400).json({success:false,insufficientBalance:true,orderStatus:"pending",orderId:pending._id,specialTask:specialTriggered,message:"Insufficient balance. Please contact Customer Service.",orderAmount:amount,availableBalance,difference,shortfall:configuredShortfall||difference,taskNumber});
+      if(!pendingOrder){
+        pendingOrder=await Order.create({
+          userId:user._id,productId:product._id,productName:product.name||"Product",
+          amount,profitRate:rate,commission:0,baseCommission:amount*(rate/100),
+          commissionMultiplier:1,availableBalance,shortfall:difference,taskNumber,
+          reviewText:String(req.body?.reviewText||"").trim(),status:"pending"
+        });
+      }else{
+        pendingOrder.availableBalance=availableBalance;
+        pendingOrder.shortfall=difference;
+        await pendingOrder.save();
+      }
+      return res.status(400).json({
+        success:false,insufficientBalance:true,orderStatus:"pending",
+        orderId:pendingOrder._id,specialTask:specialTriggered,
+        message:"Insufficient balance. Add the shortfall amount to your account, then continue this same order.",
+        orderAmount:Number(pendingOrder.amount||amount),availableBalance,difference,
+        shortfall:difference,taskNumber
+      });
     }
     const reviewText=String(req.body?.reviewText||"").trim();
     if(reviewText.length>1000)return res.status(400).json({success:false,message:"Review is too long"});
