@@ -46,7 +46,11 @@ function publicUser(user){
     referralBonus:Number(user.referralBonus||0),
     creditScore:Number(user.creditScore??100),
     vipLevel:Number(user.vipLevel||0),
-    avatarUrl:user.avatarUrl||""
+    avatarUrl:user.avatarUrl||"",
+    active:user.active!==false,
+    lastLoginIp:user.lastLoginIp||"",
+    lastLoginAt:user.lastLoginAt||null,
+    loginCount:Number(user.loginCount||0)
   };
 }
 
@@ -72,6 +76,10 @@ const UserSchema=new mongoose.Schema({
   insufficientBalanceRequiredAmount:{type:Number,default:0,min:0},
   insufficientBalanceCommissionMultiplier:{type:Number,default:1,min:1,max:20},
   avatarUrl:{type:String,default:""},
+  active:{type:Boolean,default:true},
+  lastLoginIp:{type:String,default:""},
+  lastLoginAt:{type:Date,default:null},
+  loginCount:{type:Number,default:0},
   ownerAdminId:{type:String,default:null,index:true},
   ownerAdminUsername:{type:String,default:""},
   inviteCodeUsed:{type:String,default:""},
@@ -279,6 +287,14 @@ app.post("/api/auth/login",async(req,res)=>{
     });
     if(!user||!verifyPassword(password,user.passwordHash))
       return res.status(401).json({success:false,message:"Invalid username/email or password"});
+    if(user.active===false)
+      return res.status(403).json({success:false,message:"This account is inactive"});
+
+    const forwarded=String(req.headers["x-forwarded-for"]||"").split(",")[0].trim();
+    const loginIp=forwarded||String(req.socket?.remoteAddress||req.ip||"").trim();
+    user.lastLoginIp=loginIp;
+    user.lastLoginAt=new Date();
+    user.loginCount=Number(user.loginCount||0)+1;
 
     if(!user.emailVerified){
       user.emailVerified=true;
