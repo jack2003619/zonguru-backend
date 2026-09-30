@@ -163,6 +163,12 @@ const OrderSchema=new mongoose.Schema({
   createdAt:{type:Date,default:Date.now}
 });
 const Order=mongoose.model("Order",OrderSchema);
+const PlatformSettingSchema=new mongoose.Schema({
+  key:{type:String,unique:true,index:true},
+  value:{type:mongoose.Schema.Types.Mixed,default:null},
+  updatedAt:{type:Date,default:Date.now}
+},{collection:"platform_settings"});
+const PlatformSetting=mongoose.model("PlatformSetting",PlatformSettingSchema);
 
 
 
@@ -186,6 +192,18 @@ app.get("/health",async(req,res)=>{
   }
 });
 
+app.get("/api/public/deposit-addresses",async(req,res)=>{
+  try{
+    const setting=await PlatformSetting.findOne({key:"deposit_addresses"}).lean();
+    const defaults={
+      "USDT-TRC20":"TS3fFhpyCECAtEnV7gurRyojgKVznieun5",
+      "USDT-ERC20":"0x84a872810ab213eacb8ac8e9e962faf34cd9a72b",
+      "ETH-ERC20":"0x84a872810ab213eacb8ac8e9e962faf34cd9a72b",
+      "BTC-BTC":"176xzWWVLW5KsHoikVPatuinJJ6vMrvifW"
+    };
+    res.json({success:true,addresses:{...defaults,...(setting?.value||{})}});
+  }catch(e){res.status(500).json({success:false,message:"Failed to load deposit addresses"});}
+});
 app.get("/",(req,res)=>res.json({success:true,service:"Zonguru Backend",status:"online",version:"live-chat-v1"}));
 
 /* Registration: NO email verification and NO Resend */
