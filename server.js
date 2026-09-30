@@ -316,6 +316,7 @@ function auth(req,res,next){
     const token=h.startsWith("Bearer ")?h.slice(7):"";
     if(!token)return res.status(401).json({success:false,message:"Unauthorized"});
     req.auth=jwt.verify(token,JWT_SECRET);
+    User.updateOne({_id:req.auth.id},{$set:{lastSeenAt:new Date(),onlineUntil:new Date(Date.now()+90000)}}).catch(()=>{});
     next();
   }catch{
     res.status(401).json({success:false,message:"Invalid or expired token"});
