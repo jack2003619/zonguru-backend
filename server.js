@@ -50,7 +50,9 @@ function publicUser(user){
     active:user.active!==false,
     lastLoginIp:user.lastLoginIp||"",
     lastLoginAt:user.lastLoginAt||null,
-    loginCount:Number(user.loginCount||0)
+    loginCount:Number(user.loginCount||0),
+    lastSeenAt:user.lastSeenAt||null,
+    onlineUntil:user.onlineUntil||null
   };
 }
 
@@ -79,6 +81,8 @@ const UserSchema=new mongoose.Schema({
   active:{type:Boolean,default:true},
   lastLoginIp:{type:String,default:""},
   lastLoginAt:{type:Date,default:null},
+  lastSeenAt:{type:Date,default:null},
+  onlineUntil:{type:Date,default:null},
   loginCount:{type:Number,default:0},
   ownerAdminId:{type:String,default:null,index:true},
   ownerAdminUsername:{type:String,default:""},
@@ -295,12 +299,10 @@ app.post("/api/auth/login",async(req,res)=>{
     user.lastLoginIp=loginIp;
     user.lastLoginAt=new Date();
     user.loginCount=Number(user.loginCount||0)+1;
-
-    if(!user.emailVerified){
-      user.emailVerified=true;
-      await user.save();
-    }
-
+    user.lastSeenAt=new Date();
+    user.onlineUntil=new Date(Date.now()+90000);
+    if(!user.emailVerified) user.emailVerified=true;
+    await user.save();
     res.json({success:true,token:signUser(user),user:publicUser(user)});
   }catch(e){
     console.error("login",e);
@@ -339,6 +341,14 @@ app.get("/health/db-check",async(req,res)=>{
   }catch(e){
     res.status(503).json({success:false,message:"Database check failed"});
   }
+});
+
+app.post("/api/presence/heartbeat",auth,async(req,res)=>{
+  try{
+    const user=await User.findByIdAndUpdate(req.auth.id,{$set:{lastSeenAt:new Date(),onlineUntil:new Date(Date.now()+90000)}},{new:true});
+    if(!user)return res.status(404).json({success:false,message:"User not found"});
+    res.json({success:true,online:true});
+  }catch(e){res.status(500).json({success:false,message:"Presence update failed"});}
 });
 
 app.get("/api/me",auth,async(req,res)=>{
